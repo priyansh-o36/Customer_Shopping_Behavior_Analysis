@@ -1,5 +1,5 @@
 -- ============================================================
--- Customer Shopping Behavior Analysis — SQL Queries
+-- Customer Shopping Behavior Analysis — MySQL Queries
 -- Table: customer_shopping_behavior (loaded from cleaned CSV)
 -- ============================================================
 
@@ -18,7 +18,7 @@ WHERE discount_applied = 'Yes'
 
 -- Q3. Top 5 products with the highest average review rating
 SELECT item_purchased,
-       ROUND(AVG(review_rating)::numeric, 2) AS avg_product_rating
+       ROUND(AVG(review_rating), 2) AS avg_product_rating
 FROM customer_shopping_behavior
 GROUP BY item_purchased
 ORDER BY avg_product_rating DESC
@@ -26,25 +26,19 @@ LIMIT 5;
 
 -- Q4. Compare average purchase amount between Standard and Express shipping
 SELECT shipping_type,
-       ROUND(AVG(purchase_amount)::numeric, 2) AS avg_purchase_amount
+       ROUND(AVG(purchase_amount), 2) AS avg_purchase_amount
 FROM customer_shopping_behavior
 WHERE shipping_type IN ('Standard', 'Express')
 GROUP BY shipping_type;
 
 -- Q5. Subscribers vs. non-subscribers: average spend and total revenue
--- NOTE: fixed ORDER BY bug from earlier draft (DESC was only applying to avg_spend,
--- not total_revenue, which silently produced an ascending sort on the main column).
 SELECT subscription_status,
        COUNT(customer_id) AS total_customers,
-       ROUND(AVG(purchase_amount)::numeric, 2) AS avg_spend,
-       ROUND(SUM(purchase_amount)::numeric, 2) AS total_revenue
+       ROUND(AVG(purchase_amount), 2) AS avg_spend,
+       ROUND(SUM(purchase_amount), 2) AS total_revenue
 FROM customer_shopping_behavior
 GROUP BY subscription_status
 ORDER BY total_revenue DESC, avg_spend DESC;
--- Finding: subscribers do NOT spend more on average ($59.49 vs $59.87 for
--- non-subscribers) and contribute far less total revenue, almost entirely because
--- there are fewer of them (1,053 vs 2,847). Subscription status is not, by itself,
--- a signal of higher-value customers in this dataset.
 
 -- Q6. Top 5 products with the highest percentage of discounted purchases
 SELECT item_purchased,
@@ -56,10 +50,6 @@ ORDER BY discount_rate DESC
 LIMIT 5;
 
 -- Q7. Segment customers into New, Returning, and Loyal based on previous purchases
--- NOTE: original thresholds (New = exactly 1, else Returning up to 10, else Loyal)
--- put ~80% of all customers into "Loyal", which isn't an actionable segmentation.
--- Thresholds below use the actual 25th/75th percentile of previous_purchases
--- (13 and 38) so the three groups are meaningfully sized and comparable.
 WITH customer_type AS (
     SELECT customer_id,
            previous_purchases,
@@ -108,20 +98,18 @@ ORDER BY total_revenue DESC;
 -- NEW QUERIES ADDED
 -- ============================================================
 
--- Q11. Revenue and order volume by season (closest available trend proxy —
--- the dataset has no transaction date/year column, only a categorical season field)
+-- Q11. Revenue and order volume by season
 SELECT season,
        COUNT(customer_id) AS total_orders,
        SUM(purchase_amount) AS total_revenue,
-       ROUND(AVG(purchase_amount)::numeric, 2) AS avg_order_value
+       ROUND(AVG(purchase_amount), 2) AS avg_order_value
 FROM customer_shopping_behavior
 GROUP BY season
 ORDER BY total_revenue DESC;
 
 -- Q12. Categories where average purchase amount exceeds the overall average
--- (demonstrates a HAVING clause filtering on an aggregate, distinct from WHERE)
 SELECT category,
-       ROUND(AVG(purchase_amount)::numeric, 2) AS avg_purchase_amount,
+       ROUND(AVG(purchase_amount), 2) AS avg_purchase_amount,
        COUNT(customer_id) AS total_orders
 FROM customer_shopping_behavior
 GROUP BY category
@@ -129,7 +117,7 @@ HAVING AVG(purchase_amount) > (SELECT AVG(purchase_amount) FROM customer_shoppin
 ORDER BY avg_purchase_amount DESC;
 
 -- Q13. States/locations where the "bad" outcome rate (low review rating, <3.0)
--- is above the overall average low-rating rate — a correlated-subquery pattern
+-- is above the overall average low-rating rate
 SELECT location,
        ROUND(100.0 * SUM(CASE WHEN review_rating < 3.0 THEN 1 ELSE 0 END)
              / COUNT(*), 2) AS low_rating_pct
@@ -149,8 +137,7 @@ SELECT age_group,
 FROM customer_shopping_behavior
 GROUP BY age_group;
 
--- Q15. Average spend by customer segment (ties Q7 segmentation to actual value,
--- which the original report's recommendations never did)
+-- Q15. Average spend by customer segment
 WITH customer_type AS (
     SELECT customer_id,
            purchase_amount,
@@ -163,8 +150,8 @@ WITH customer_type AS (
 )
 SELECT customer_segment,
        COUNT(*) AS number_of_customers,
-       ROUND(AVG(purchase_amount)::numeric, 2) AS avg_spend,
-       ROUND(SUM(purchase_amount)::numeric, 2) AS total_revenue
+       ROUND(AVG(purchase_amount), 2) AS avg_spend,
+       ROUND(SUM(purchase_amount), 2) AS total_revenue
 FROM customer_type
 GROUP BY customer_segment
 ORDER BY total_revenue DESC;
